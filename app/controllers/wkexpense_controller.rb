@@ -32,7 +32,7 @@ class WkexpenseController < WktimeController
   end
   
   def getUnit(entry)
-	entry.nil? ? number_currency_format_unit : entry[:currency]
+	entry.nil? ? l('number.currency.format.unit') : entry[:currency]
   end
   
   def getUnitDDHTML

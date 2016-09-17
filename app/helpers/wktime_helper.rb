@@ -3,7 +3,7 @@ module WktimeHelper
   include Redmine::Export::PDF
   include Redmine::Export::PDF::IssuesPdfHelper
   include Redmine::Utils::DateCalculation
-
+	include Redmine::I18n
 	def options_for_period_select(value)
 		options_for_select([[l(:label_all_time), 'all'],
 							[l(:label_this_week), 'current_week'],
@@ -52,7 +52,7 @@ module WktimeHelper
 			project_tree(projects) do |proj, level|
 				indent_level = (level > 0 ? ('&nbsp;' * 2 * level + '&#187; ').html_safe : '')
 				sel_project = projects.select{ |p| p.id == proj.id }
-				projArr << [ (indent_level + sel_project[0].name), sel_project[0].id ]
+				projArr << [ (indent_level + sel_project[0].to_s), sel_project[0].id ] if sel_project[0]
 			end
 		end
 		projArr

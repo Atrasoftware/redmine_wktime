@@ -28,6 +28,7 @@ The following configurations can be made on the plugin
 	- Set submission deadline
 	- Set projects for expense
 	- Allow User filtering to My Issues
+	- Public holidays can be configured
 	- 'Approve time log' permission
 	- T&E Admin groups can be configured
 	- Enable Clock In / Clock Out

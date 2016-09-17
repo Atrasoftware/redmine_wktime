@@ -1,6 +1,9 @@
 <%= javascript_include_tag 'index', :plugin => "redmine_wktime" %>
 <%= stylesheet_link_tag 'wk-time', :plugin => "redmine_wktime" %>
-<script type="text/javascript"> 
+<%= stylesheet_link_tag 'select2', :plugin => "redmine_wktime" %>
+<%= javascript_include_tag 'select2', :plugin => "redmine_wktime" %>
+
+<script type="text/javascript">
 	prevTab = 'tab-<%= "#{controller_name}" %>';
 	grpUrl="<%= "#{url_for(:controller => controller_name, :action => 'getMembersbyGroup')}" %>";
 	userUrl="<%= "#{url_for(:controller => controller_name, :action => 'getusers')}" %>";
@@ -56,8 +59,8 @@
 <%=	filters %>
 <% else %>
 <% if !@manage_view_spenttime_projects.blank? %>
-<div class="div-left">
-<table>
+<div class="div-left autoscroll">
+<table class="list ">
 <script type="text/javascript"> 
 $(document).ready(function()
 {
@@ -108,7 +111,7 @@ $(document).ready(function()
 <% end %>
 <% end %>
 
-<div id="rightMenu" class="div-right">
+<div id="rightMenu " class="div-right autoscroll">
 <table>
 <tr>
 <th valign="top"><%=l(:field_status)%></th>
@@ -139,3 +142,8 @@ $(document).ready(function()
 <% content_for :header_tags do %>
     <%= auto_discovery_link_tag(:atom, {:issue_id => @issue, :format => 'atom', :key => User.current.rss_key}, :title => l(:label_spent_time)) %>
 <% end %>
+<script type="text/javascript">
+	$(document).ready(function() {
+		$(".div-left").find('.project').children('select').select2();
+	});
+</script>
