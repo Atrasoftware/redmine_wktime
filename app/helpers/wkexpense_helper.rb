@@ -2,7 +2,15 @@ module WkexpenseHelper
 	include QueriesHelper
 	def options_for_currency
 	 #method valid_languages - defined in i18n.rb
-	 valid_languages.map {|lang| [ll(lang.to_s, 'number.currency.format.unit'), ll(lang.to_s,'number.currency.format.unit')]}.uniq	 
+	 valid_languages.map {|lang|
+		 begin
+		 [
+				 ll(lang.to_s, 'number.currency.format.unit'),
+				 ll(lang.to_s,'number.currency.format.unit')]
+		 rescue
+			 nil
+			 end
+	 }.flatten.uniq
     end
 	
 	def render_wkexpense_breadcrumb
