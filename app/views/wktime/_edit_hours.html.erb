@@ -28,7 +28,6 @@
 			<td class="hours">
 				<div style="float: left; ">
 				<%=h text_field_tag('hours' + @row.to_s() +'[]', entry.nil? || @prev_template ? '' : ("%.2f" % entry.hours) ,:size => "#{controller.textfield_size}",
-				:disabled => disable,
 				:onchange => "validateTotal(this, #{@wday_index},'#{controller.maxHour}');") %>
 				
 				<%=h hidden_field_tag('ids' + @row.to_s() +'[]', entry.nil? || @prev_template ? '' : entry.id) %>
