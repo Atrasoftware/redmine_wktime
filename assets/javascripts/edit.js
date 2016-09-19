@@ -1761,10 +1761,13 @@ function calculatebreakTimeNew(totTime, day, element){
  var startval, endval, breakStart, breakEnd, startTime, endTime, workedHours;
  var breakTime = new Array();
  var breakValue = new Array();
- startval = document.getElementById(element ? element[0] : 'start_'+day).value;
- endval = document.getElementById(element ? element[1] : 'end_'+day).value;
+ startelt = document.getElementById(element ? element[0] : 'start_'+day);
+ endelt = document.getElementById(element ? element[1] : 'end_'+day);
  workedHours = convertTimeToSec(totTime);
- 
+	if(startelt)
+		startval = startelt.value;
+	if(endelt)
+		endval = endelt.value
  if(startval && endval)
  {
   startTime = convertTimeToSec(startval);
