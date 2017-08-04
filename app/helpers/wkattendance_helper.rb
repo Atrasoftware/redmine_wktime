@@ -1,3 +1,20 @@
+# ERPmine - ERP for service industry
+# Copyright (C) 2011-2016  Adhi software pvt ltd
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+
 module WkattendanceHelper	
 	include WktimeHelper
 	require 'csv' 
@@ -8,11 +25,6 @@ module WkattendanceHelper
                         ["#{l(:status_active)} (#{user_count_by_status[1].to_i})", '1'],
                         ["#{l(:status_registered)} (#{user_count_by_status[2].to_i})", '2'],
                         ["#{l(:status_locked)} (#{user_count_by_status[3].to_i})", '3']], selected.to_s)
-	end
-	
-	def getSettingCfId(settingId)
-		cfId = Setting.plugin_redmine_wktime[settingId].blank? ? 0 : Setting.plugin_redmine_wktime[settingId].to_i
-		cfId
 	end
 	
 	def getLeaveIssueIds
@@ -34,10 +46,12 @@ module WkattendanceHelper
 	def populateWkUserLeaves		
 		leavesInfo = Setting.plugin_redmine_wktime['wktime_leave']
 		leaveAccrual = Hash.new
+		accrualMultiplier = Hash.new
 		leaveAccAfter = Hash.new
 		resetMonth = Hash.new
 		strIssueIds = ""
-		currentMonthStart = Date.civil(Date.today.year, Date.today.month, 1)
+		processDate = params[:fromdate].to_s.to_date
+		currentMonthStart = Date.civil(processDate.year, processDate.month, 1)
 		if !leavesInfo.blank?
 			leavesInfo.each do |leave|
 				issue_id = leave.split('|')[0].strip
@@ -45,12 +59,11 @@ module WkattendanceHelper
 				leaveAccrual[issue_id] = leave.split('|')[1].blank? ? 0 : leave.split('|')[1].strip
 				leaveAccAfter[issue_id] = leave.split('|')[2].blank? ? 0 : leave.split('|')[2].strip
 				resetMonth[issue_id] = leave.split('|')[3].blank? ? 0 : leave.split('|')[3].strip
+				accrualMultiplier[issue_id] = leave.split('|')[5].blank? ? 1 : leave.split('|')[5].strip
 			end
 		end
 		
 		deleteWkUserLeaves(nil, currentMonthStart - 1)
-		
-		joinDateCFID = !Setting.plugin_redmine_wktime['wktime_attn_join_date_cf'].blank? ? Setting.plugin_redmine_wktime['wktime_attn_join_date_cf'].to_i : 0
 		
 		if !strIssueIds.blank?		
 			from = currentMonthStart << 1
@@ -73,7 +86,7 @@ module WkattendanceHelper
 					"group by user_id) v3 on v3.user_id = v1.user_id " +
 					"left join wk_user_leaves ul on ul.user_id = v1.user_id and ul.issue_id = v1.issue_id " +
 					"and ul.accrual_on between '#{prev_mon_from}' and '#{prev_mon_to}' " +
-					"left join custom_values c on c.customized_id = v1.user_id and c.custom_field_id = #{joinDateCFID} " +
+					"left join custom_values c on c.customized_id = v1.user_id and c.custom_field_id = #{getSettingCfId('wktime_attn_join_date_cf')} " +
 					"where v1.status = 1 and v1.type = 'User'"
 					
 			entries = TimeEntry.find_by_sql(qryStr)		
@@ -83,17 +96,20 @@ module WkattendanceHelper
 					yearDiff = ((Date.today - userJoinDate).to_i / 365.0)
 					accrualAfter = leaveAccAfter["#{entry.issue_id}"].to_f						
 					includeAccrual = yearDiff >= accrualAfter ? true : false
-					accrual = leaveAccrual["#{entry.issue_id}"].to_i
+					accrual = leaveAccrual["#{entry.issue_id}"].to_f
+					multiplier = accrualMultiplier["#{entry.issue_id}"].to_f
 						
 					#Accrual will be given only when the user works atleast 11 days a month
-					if (entry.spent_hours.blank? || (!entry.spent_hours.blank? && entry.spent_hours < (defWorkTime * 11)) || !includeAccrual)
+					minWorkingDays = Setting.plugin_redmine_wktime['wktime_minimum_working_days_for_accrual']
+					minWorkingDays = minWorkingDays.blank? ? 0 : minWorkingDays.to_f
+					if ((entry.spent_hours.blank? && minWorkingDays>0) || (!entry.spent_hours.blank? && entry.spent_hours < (defWorkTime * minWorkingDays)) || !includeAccrual)
 						accrual = 0
 					end
 					lastMntBalance = entry.balance.blank? ? 0 : entry.balance
 					lastMntAccrual = entry.accrual.blank? ? 0 : entry.accrual
 					no_of_holidays = lastMntBalance + lastMntAccrual #entry.balance.blank? ? entry.accrual : entry.balance + entry.accrual
 					if !entry.used.blank? && entry.used > 0
-						no_of_holidays = no_of_holidays - entry.used
+						no_of_holidays = no_of_holidays - (entry.used * multiplier)
 					end
 					#Reset					
 					lastMonth = (currentMonthStart - 1).month		
@@ -111,6 +127,12 @@ module WkattendanceHelper
 				end
 			end
 		end
+	end
+	
+	def convertHrTodays(hours)
+		defWorkTime = !Setting.plugin_redmine_wktime['wktime_default_work_time'].blank? ? Setting.plugin_redmine_wktime['wktime_default_work_time'].to_i : 8
+		noOfDays = (hours/defWorkTime).round(2).round unless hours.blank?
+		noOfDays
 	end
 	
 	def deleteWkUserLeaves(userId, accrualOn)
@@ -160,6 +182,26 @@ module WkattendanceHelper
 			wkattendance = addNewAttendance(startTime,endTime,userId)
 		end
 		wkattendance
+	end
+	
+	#def getWorkingDays(fromDate,toDate)
+		#workingDays = TimeEntry.where("spent_on between '#{fromDate}' and '#{toDate}'").distinct(true).count(:spent_on)
+		#workingDays
+		#workingDays = toDate - fromDate
+		#workingDays
+	#end
+	
+	def getWorkedHours(userId,fromDate,toDate)
+		workedHours = TimeEntry.where("user_id = #{userId} and spent_on between '#{fromDate}' and '#{toDate}' and issue_id not in (#{getLeaveIssueIds})").sum(:hours)
+		workedHours
+	end
+	
+	def getLeaveQueryStr(from,to)
+		queryStr = "select * from wk_user_leaves WHERE issue_id in (#{getLeaveIssueIds}) and accrual_on between '#{from}' and '#{to}'"
+		if !(isAccountUser || User.current.admin?)
+			queryStr = queryStr + " and user_id = #{User.current.id} "
+		end
+		queryStr
 	end
 
 end

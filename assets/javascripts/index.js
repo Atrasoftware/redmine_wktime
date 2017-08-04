@@ -1,7 +1,8 @@
-var wkattnIndexUrl,wkReportUrl,clockInOutUrl;
+var wktimeIndexUrl, wkexpIndexUrl, wkattnIndexUrl,wkReportUrl,clockInOutUrl, payrollUrl, userssettingsUrl, blgaccUrl, blgcontractsUrl, blgaccpjtsUrl, blginvoiceUrl, blgtaxUrl, blgtxnUrl, blgledgerUrl, crmleadsUrl, crmopportunityUrl, crmactivityUrl, crmcontactUrl, crmenumUrl, blgpaymentUrl, blgexcrateUrl, purRfqUrl, purQuoteUrl, purPurOrderUrl, purSupInvUrl, purSupAccUrl, purSupContactUrl, purSupPayUrl;
 var no_user ="";
 var grpUrl="";
 var userUrl="";
+var accountUrl ="";
 var userList = new Array();
 var rSubEmailUrl = "";
 var rAppEmailUrl = "";
@@ -88,11 +89,19 @@ $(document).ready(function() {
 function openReportPopup(){
 	var popupUrl, periodType;
 	var reportType = document.getElementById('report_type').value;
-	var groupId = "", userId = "";
+	var groupId = "", userId = "", actionType = "", projectId = "";
 	if(document.getElementById('group_id')) {
 		groupId = document.getElementById('group_id').value;
 		userId = document.getElementById('user_id').value;
 	}
+	if(document.getElementById('action_type')) {
+	   actionType = document.getElementById('action_type').value;
+	}
+	
+	if(document.getElementById('project_id')) {
+		projectId = document.getElementById('project_id').value;	
+	}
+	
 	var period = document.getElementById('period').value;
 	var searchlist = document.getElementById('searchlist').value;
 	var periodTypes = document.getElementsByName('period_type');
@@ -104,13 +113,14 @@ function openReportPopup(){
 			break;
 		}
 	}
-	popupUrl = wkattnReportUrl + '&report_type=' + reportType + '&group_id=' + groupId + '&user_id=' + userId + '&period_type=' + periodType + '&searchlist=' + searchlist; 
+	//popupUrl = wkattnReportUrl + '&report_type=' + reportType + '&group_id=' + groupId + '&user_id=' + userId + '&period_type=' + periodType + '&searchlist=' + searchlist; 
+	popupUrl = wkattnReportUrl + '&report_type=' + reportType + '&group_id=' + groupId + '&action_type=' + actionType + '&user_id=' + userId + '&period_type=' + periodType + '&searchlist=' + searchlist + '&project_id=' + projectId;
 	if(periodType>1){
 		popupUrl = popupUrl + '&from=' + fromVal + '&to=' + toVal		
 	}else{
 		popupUrl = popupUrl + '&period=' + period 
 	}
-	window.open(popupUrl, '_blank', 'location=yes,scrollbars=yes,status=yes');
+	window.open(popupUrl, '_blank', 'location=yes,scrollbars=yes,status=yes, resizable=yes'); 
 }
 
 function showReminderEmailDlg() {
@@ -165,7 +175,6 @@ function resetReminderEmailDlg() {
 }
 
 function projChanged(projDropdown, userid, needBlankOption){
-	
 	var id = projDropdown.options[projDropdown.selectedIndex].value;
 	var fmt = 'text';
 	var userDropdown = document.getElementById("user_id");
@@ -175,21 +184,20 @@ function projChanged(projDropdown, userid, needBlankOption){
 		url: userUrl,
 		type: 'get',
 		data: {project_id: id, user_id: userid, format:fmt},
-		success: function(data){ updateUserDD(data, userDropdown, userid, needBlankOption, false); },
+		success: function(data){ updateUserDD(data, userDropdown, userid, needBlankOption, false,"All Users"); },
 		beforeSend: function(){ $this.addClass('ajax-loading'); },
 		complete: function(){ $this.removeClass('ajax-loading'); }
 	});
 	
 }
 
-function updateUserDD(itemStr, dropdown, userid, needBlankOption, skipFirst)
+function updateUserDD(itemStr, dropdown, userid, needBlankOption, skipFirst, blankText)
 {
-	
 	var items = itemStr.split('\n');
 	var i, index, val, text, start;
 	dropdown.options.length = 0;
 	if(needBlankOption){
-		dropdown.options[0] = new Option("All Users", "0", false, false) 
+		dropdown.options[0] = new Option(blankText, "0", false, false) 
 	}
 	for(i=0; i < items.length-1; i++){
 		index = items[i].indexOf(',');
@@ -213,8 +221,33 @@ function updateUserDD(itemStr, dropdown, userid, needBlankOption, skipFirst)
 
 $(document).ready(function()
 {
+	changeProp('tab-wktime',wktimeIndexUrl);
+	changeProp('tab-wkexpense',wkexpIndexUrl);
 	changeProp('tab-leave',wkattnIndexUrl);
 	changeProp('tab-clock',clockInOutUrl);
+	changeProp('tab-payroll',payrollUrl);
+	changeProp('tab-usersettings',userssettingsUrl);
+	changeProp('tab-wkcrmaccount',blgaccUrl);
+	changeProp('tab-wkcontract',blgcontractsUrl);
+	changeProp('tab-wkaccountproject',blgaccpjtsUrl);
+	changeProp('tab-wkinvoice',blginvoiceUrl);
+	changeProp('tab-wktax',blgtaxUrl);
+	changeProp('tab-wkgltransaction',blgtxnUrl);
+	changeProp('tab-wkledger',blgledgerUrl);
+	changeProp('tab-wklead',crmleadsUrl);
+	changeProp('tab-wkopportunity',crmopportunityUrl);
+	changeProp('tab-wkcrmactivity',crmactivityUrl);
+	changeProp('tab-wkcrmcontact',crmcontactUrl);
+	changeProp('tab-wkcrmenumeration',crmenumUrl);
+	changeProp('tab-wkpayment',blgpaymentUrl);
+	changeProp('tab-wkexchangerate',blgexcrateUrl);
+	changeProp('tab-wkrfq',purRfqUrl);
+	changeProp('tab-wkquote',purQuoteUrl);
+	changeProp('tab-wkpurchaseorder',purPurOrderUrl);
+	changeProp('tab-wksupplierinvoice',purSupInvUrl);
+	changeProp('tab-wksupplierpayment',purSupPayUrl);
+	changeProp('tab-wksupplieraccount',purSupAccUrl);
+	changeProp('tab-wksuppliercontact',purSupContactUrl);
 });
 
 
@@ -250,7 +283,7 @@ function validateMember()
 }
 function reportChanged(reportDD, userid){
 	var id = reportDD.options[reportDD.selectedIndex].value;
-	var needBlankOption = ((id == 'attendance_report' || id == 'spent_time_report') ? true : false) ;
+	var needBlankOption = ((id == 'attendance_report' || id == 'spent_time_report' || id == 'payroll_rpt') ? true : false) ;
 	grpChanged(document.getElementById("group_id"), userid, needBlankOption)
 }
 
@@ -263,7 +296,7 @@ function grpChanged(grpDropdown, userid, needBlankOption){
 		url: grpUrl,
 		type: 'get',
 		data: {user_id: userid, format:fmt,group_id:id},
-		success: function(data){ updateUserDD(data, userDropdown, userid, needBlankOption, false); },
+		success: function(data){ updateUserDD(data, userDropdown, userid, needBlankOption, false,"All Users"); },
 		beforeSend: function(){ $this.addClass('ajax-loading'); },
 		complete: function(){ $this.removeClass('ajax-loading'); }
 	});
@@ -275,4 +308,122 @@ function progrpChanged(btnoption, userid, needBlankOption){
 	else{
 		grpChanged(document.getElementById("group_id"), userid, needBlankOption)
 	}
+}
+
+function accProjChanged(uid, fldId, isparent, blankOptions)
+{
+	var acc_name = document.getElementById(fldId);//document.getElementById("account_id");
+	var parentId = 0
+	if( acc_name.length > 0)
+	{
+		parentId = acc_name.options[acc_name.selectedIndex].value;
+	}
+	var parentType = "WkAccount";
+	var $this = $(this);
+	if(isparent)
+	{
+		var parentDD = document.getElementById('related_to');
+		parentType = parentDD.options[parentDD.selectedIndex].value;
+	} else {
+		parentType = fldId == 'contact_id' && parentId != "" ? 'WkCrmContact' : ( fldId == 'account_id' && parentId != "" ? 'WkAccount' : '');
+	}
+	var needBlankOption = blankOptions;
+	var projDropdown = document.getElementById("project_id");	
+	userid = uid;
+	$.ajax({
+	url: accountUrl,
+	type: 'get',
+	data: {parent_id: parentId, parent_type: parentType},
+	success: function(data){ updateUserDD(data, projDropdown, userid, needBlankOption, false, "");},
+	beforeSend: function(){ $this.addClass('ajax-loading'); },
+	complete: function(){ $this.removeClass('ajax-loading'); }	
+	});
+}
+
+function actRelatedDd(uid, loadProjects, needBlankOption, actType, contactType, loadPayment)
+{
+	var relatedTo = document.getElementById("related_to");
+	var relatedType = relatedTo.options[relatedTo.selectedIndex].value;
+	//var needBlankOption = false;
+	var relatedparentdd = document.getElementById("related_parent");
+	userid = uid;
+	var $this = $(this);
+	$.ajax({
+	url: actRelatedUrl,
+	type: 'get',
+	data: {related_type: relatedType, account_type: actType, contact_type: contactType},
+	success: function(data){ updateUserDD(data, relatedparentdd, userid, needBlankOption, false, "");},
+	beforeSend: function(){ $this.addClass('ajax-loading'); },
+	complete: function(){ if(loadProjects) { accProjChanged(uid, 'related_parent', true, true) }if(loadPayment){submitFiletrForm();} $this.removeClass('ajax-loading'); }	   
+	});
+}
+
+function parentChanged(uid)
+{
+	var parentType = document.getElementById("related_to");
+	var parentTypeVal = parentType.options[parentType.selectedIndex].value;
+	var parentDD = document.getElementById("related_parent");
+	var parentId = parentDD.options[parentDD.selectedIndex].value;
+	var needBlankOption = true;
+	var projDropdown = document.getElementById("project_id");
+	userid = uid;
+	$.ajax({
+	url: paymentUrl,
+	type: 'get',
+	data: {related_to: parentTypeVal, related_parent: parentId},
+	success: function(data){ updateUserDD(data, projDropdown, userid, needBlankOption, false, "");},   
+	});
+}
+
+function submitFiletrForm()
+{
+	document.getElementById("invoice_form").submit();
+}
+
+function rfqTOQuoteChanged(uid, loadDdId)
+{
+	var rfqDD = document.getElementById("rfq_id");
+	var rfqId = rfqDD.options[rfqDD.selectedIndex].value;
+	var parentId = "", ParentType = "WkAccount";
+	if(document.getElementById("polymorphic_filter_2").checked)
+	{
+		var contactDD = document.getElementById("contact_id");
+		parentId = contactDD.options[contactDD.selectedIndex].value;
+		ParentType = "WkCrmContact";
+	}
+	else
+	{
+		var actDD = document.getElementById("account_id");
+		parentId = actDD.options[actDD.selectedIndex].value;
+	}
+	var loadDropdown = document.getElementById(loadDdId);	
+	var needBlankOption = false;
+	userid = uid;
+	var $this = $(this);
+	$.ajax({
+	url: rfqQuoteUrl,
+	type: 'get',
+	data: {rfq_id: rfqId, parent_id: parentId, parent_type: ParentType},
+	success: function(data){ updateUserDD(data, loadDropdown, userid, needBlankOption, false, "");},
+	beforeSend: function(){ $this.addClass('ajax-loading'); },
+	complete: function(){ $this.removeClass('ajax-loading'); }	   
+	});
+}
+
+function dateRangeValidation(fromId, toId)
+{	
+	var fromElement = document.getElementById(fromId);
+	var toElement = document.getElementById(toId);
+	var fromdate = new Date(fromElement.value);
+	var todate = new Date(toElement.value);
+	var d = new Date();
+	if(fromdate > todate)
+	{
+		fromElement.value = fromElement.defaultValue;
+		d.setDate(fromdate.getDate()+30);
+		d.setMonth(d.getMonth()+1);
+		toElement.value = d.getFullYear() + "-" + d.getMonth() + "-" + d.getDate();
+		alert(" End date should be greater then start date ");
+	}
+	
 }

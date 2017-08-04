@@ -1,9 +1,27 @@
+# ERPmine - ERP for service industry
+# Copyright (C) 2011-2016  Adhi software pvt ltd
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+
 module WktimeHelper
   include ApplicationHelper
   include Redmine::Export::PDF
   include Redmine::Export::PDF::IssuesPdfHelper
   include Redmine::Utils::DateCalculation
-	include Redmine::I18n
+  
+
 	def options_for_period_select(value)
 		options_for_select([[l(:label_all_time), 'all'],
 							[l(:label_this_week), 'current_week'],
@@ -52,7 +70,7 @@ module WktimeHelper
 			project_tree(projects) do |proj, level|
 				indent_level = (level > 0 ? ('&nbsp;' * 2 * level + '&#187; ').html_safe : '')
 				sel_project = projects.select{ |p| p.id == proj.id }
-				projArr << [ (indent_level + sel_project[0].to_s), sel_project[0].id ] if sel_project[0]
+				projArr << [ (indent_level + sel_project[0].name), sel_project[0].id ]
 			end
 		end
 		projArr
@@ -562,8 +580,9 @@ end
 	
 	def getTimeEntryStatus(spent_on,user_id)
 		#result = Wktime.find(:all, :conditions => [ 'begin_date = ? AND user_id = ?', getStartDay(spent_on), user_id])	
-		start_day = getStartDay(spent_on)		
-		locked = call_hook(:controller_check_locked,{ :startdate => start_day})
+		start_day = getStartDay(spent_on)	
+		locked  = isLocked(start_day)
+		#locked = call_hook(:controller_check_locked,{ :startdate => start_day})
 		locked  = locked.blank? ? '' : (locked.is_a?(Array) ? (locked[0].blank? ? '': locked[0].to_s) : locked.to_s) 
 		locked = ( !locked.blank? && to_boolean(locked))
 		if locked
@@ -576,24 +595,60 @@ end
 	end
 	
 	def time_expense_tabs
-		tabs = [
+		if params[:controller] == "wktime" || params[:controller] == "wkexpense"
+			tabs = [
+				{:name => 'wktime', :partial => 'wktime/tab_content', :label => :label_wktime},
+				{:name => 'wkexpense', :partial => 'wktime/tab_content', :label => :label_wkexpense}
+			   ]
+		elsif params[:controller] == "wkattendance"
+			tabs = [
 				{:name => 'leave', :partial => 'wktime/tab_content', :label => :label_wk_leave},
 				{:name => 'clock', :partial => 'wktime/tab_content', :label => :label_clock}
 			   ]
-	#	if !Setting.plugin_redmine_wktime['wktime_enable_expense_module'].blank? &&
-	#		Setting.plugin_redmine_wktime['wktime_enable_expense_module'].to_i == 1 
-	#		tabs[tabs.length] = {:name => 'wkexpense', :partial => 'wktime/tab_content', :label => :label_wkexpense}
-	#	end
+		elsif params[:controller] == "wkpayroll"
+			tabs = [
+				{:name => 'payroll', :partial => 'wktime/tab_content', :label => :label_payroll},
+				{:name => 'usersettings', :partial => 'wktime/tab_content', :label => :label_user_settings}
+			   ]
+		elsif params[:controller] == "wklead" || params[:controller] == "wkcrmaccount" || params[:controller] == "wkopportunity" || params[:controller] == "wkcrmactivity" || params[:controller] == "wkcrmcontact"
+			tabs = [
+				{:name => 'wklead', :partial => 'wktime/tab_content', :label => :label_lead_plural},
+				{:name => 'wkcrmaccount', :partial => 'wktime/tab_content', :label => :label_accounts},
+				{:name => 'wkopportunity', :partial => 'wktime/tab_content', :label => :label_opportunity_plural},
+				{:name => 'wkcrmactivity', :partial => 'wktime/tab_content', :label => :label_activity_plural},
+				{:name => 'wkcrmcontact', :partial => 'wktime/tab_content', :label => :label_contact_plural}
+			   ]
 		
-	#	if !Setting.plugin_redmine_wktime['wktime_enable_attendance_module'].blank? &&
-	#		Setting.plugin_redmine_wktime['wktime_enable_attendance_module'].to_i == 1 
-	#		tabs[tabs.length] = {:name => 'wkattendance', :partial => 'wktime/tab_content', :label => :label_wk_attendance}
-	#	end
-		
-	#	if !Setting.plugin_redmine_wktime['wktime_enable_report_module'].blank? &&
-	#		Setting.plugin_redmine_wktime['wktime_enable_report_module'].to_i == 1 
-	#		tabs[tabs.length] = {:name => 'wkreport', :partial => 'wktime/tab_content', :label => :label_report_plural}
-	#	end
+		elsif params[:controller] == "wkinvoice" || params[:controller] == "wkcontract" || params[:controller] == "wkaccountproject" || params[:controller] == "wktax" || params[:controller] == "wkpayment" || params[:controller] == "wkexchangerate"
+			tabs = [
+				{:name => 'wkinvoice', :partial => 'wktime/tab_content', :label => :label_invoice},
+				{:name => 'wkpayment', :partial => 'wktime/tab_content', :label => :label_payments},
+			#	{:name => 'wkcrmaccount', :partial => 'wktime/tab_content', :label => :label_accounts},
+				{:name => 'wkcontract', :partial => 'wktime/tab_content', :label => :label_contracts},
+				{:name => 'wkaccountproject', :partial => 'wktime/tab_content', :label => :label_acc_projects},				
+				{:name => 'wktax', :partial => 'wktime/tab_content', :label => :label_tax},
+				{:name => 'wkexchangerate', :partial => 'wktime/tab_content', :label => :label_exchange_rate}
+			   ]
+		elsif params[:controller] == "wkgltransaction" || params[:controller] == "wkledger"
+			tabs = [
+				{:name => 'wkgltransaction', :partial => 'wktime/tab_content', :label => :label_transaction},
+				{:name => 'wkledger', :partial => 'wktime/tab_content', :label => :label_ledger}
+			   ]
+		elsif params[:controller] == "wkrfq" || params[:controller] == "wkquote" || params[:controller] == "wkpurchaseorder" || params[:controller] == "wksupplierinvoice" || params[:controller] == "wksupplierpayment" || params[:controller] == "wksupplieraccount" || params[:controller] == "wksuppliercontact"
+			tabs = [
+				{:name => 'wkrfq', :partial => 'wktime/tab_content', :label => :label_rfq},
+				{:name => 'wkquote', :partial => 'wktime/tab_content', :label => :label_quotes},
+				{:name => 'wkpurchaseorder', :partial => 'wktime/tab_content', :label => :label_purchase_order},
+				{:name => 'wksupplierinvoice', :partial => 'wktime/tab_content', :label => :label_supplier_invoice},
+				{:name => 'wksupplierpayment', :partial => 'wktime/tab_content', :label => :label_supplier_payment},
+				{:name => 'wksupplieraccount', :partial => 'wktime/tab_content', :label => :label_supplier_account},
+				{:name => 'wksuppliercontact', :partial => 'wktime/tab_content', :label => :label_supplier_contact}
+			   ]
+		else
+			tabs = [
+				{:name => 'wkcrmenumeration', :partial => 'wktime/tab_content', :label => :label_enumerations}
+			   ]
+		end
 		tabs
 	end		
 	
@@ -684,11 +739,14 @@ end
 	def settings_tabs		   
 		tabs = [
 				{:name => 'general', :partial => 'settings/tab_general', :label => :label_general},
-				{:name => 'display', :partial => 'settings/tab_display', :label => :label_display},
-				{:name => 'wktime', :partial => 'settings/tab_time', :label => :label_wktime},
-				{:name => 'wkexpense', :partial => 'settings/tab_expense', :label => :label_wkexpense},
-				{:name => 'approval', :partial => 'settings/tab_approval', :label => :label_wk_approval_system},
-				{:name => 'attendance', :partial => 'settings/tab_attendance', :label => :label_wk_attendance}
+			#	{:name => 'display', :partial => 'settings/tab_display', :label => :label_display},
+				{:name => 'wktime', :partial => 'settings/tab_time', :label => :label_te},
+				{:name => 'attendance', :partial => 'settings/tab_attendance', :label => :report_attendance},
+				{:name => 'payroll', :partial => 'settings/tab_payroll', :label => :label_payroll},
+				{:name => 'billing', :partial => 'settings/tab_billing', :label => :label_wk_billing},
+				{:name => 'accounting', :partial => 'settings/tab_accounting', :label => :label_accounting},
+				{:name => 'CRM', :partial => 'settings/tab_crm', :label => :label_crm},
+				{:name => 'purchase', :partial => 'settings/tab_purchase', :label => :label_purchasing}
 			   ]	
 	end	
 	
@@ -797,9 +855,14 @@ end
 				groupusers << scope.all
 			end
 		end
-		grpUserIds = Array.new		
-		grpUserIds = groupusers[0].collect{|user| user.id}.uniq if !groupusers.blank? && !groupusers[0].blank?
-		isAccountUser = grpUserIds.include?(User.current.id)
+		grpUserIds = Array.new	
+		#grpUserIds = groupusers[0].collect{|user| user.id}.uniq if !groupusers.blank? && !groupusers[0].blank?
+		groupusers.each do |groupuser|
+			groupuser.each do |user|
+					 grpUserIds << user.id
+			end
+		end
+  		isAccountUser = grpUserIds.include?(User.current.id)
 	end
 	
 	def getAccountUserProjects
@@ -817,6 +880,24 @@ end
 			dateSqlStr = "adddate('#{dtfield}', " + noOfDays.to_s + ")"
 		end		
 		dateSqlStr
+	end
+	
+	def getAddMonthDateStr(dtfield,intervalVal,intervalType)
+		interval = getIntervalFormula(intervalVal)
+		if ActiveRecord::Base.connection.adapter_name == 'PostgreSQL'			 
+			dateSqlStr = "date('#{dtfield}') + interval '1 month' * "	+ interval.to_s
+		elsif ActiveRecord::Base.connection.adapter_name == 'SQLite'			 
+			dateSqlStr = "date('#{dtfield}' , '+' || " + "(#{interval.to_s})" + " || ' months')"
+		elsif ActiveRecord::Base.connection.adapter_name == 'SQLServer'		
+			dateSqlStr = "DateAdd(m, " + interval.to_s + ",'#{dtfield}')"
+		else
+			dateSqlStr = "adddate('#{dtfield}', " + interval.to_s + " MONTH )"
+		end		
+		dateSqlStr
+	end
+	
+	def getIntervalFormula(intervalVal)
+		(t4.i*intervalVal*10000 + t3.i*intervalVal*1000 + t2.i*intervalVal*100 + t1.i*intervalVal*10 + t0.i*intervalVal)
 	end
 	
 	def getConvertDateStr(dtfield)		
@@ -996,11 +1077,178 @@ end
 	
 	 # Returns the options for the date_format setting
     def date_format_options
-    Import::DATE_FORMATS.map do |f|
-      format = f.gsub('%', '').gsub(/[dmY]/) do
-        {'d' => 'DD', 'm' => 'MM', 'Y' => 'YYYY'}[$&]
-      end
-      [format+" HH:MM:SS", f + " %T"]
-    end
-  end
+		Import::DATE_FORMATS.map do |f|
+		  format = f.gsub('%', '').gsub(/[dmY]/) do
+			{'d' => 'DD', 'm' => 'MM', 'Y' => 'YYYY'}[$&]
+		  end
+		  [format+" HH:MM:SS", f + " %T"]
+		end
+	end
+	
+	def showPayroll
+		!Setting.plugin_redmine_wktime['wktime_enable_payroll_module'].blank? &&
+			Setting.plugin_redmine_wktime['wktime_enable_payroll_module'].to_i == 1
+	end
+	
+	def showBilling
+		(!Setting.plugin_redmine_wktime['wktime_enable_billing_module'].blank? &&
+			Setting.plugin_redmine_wktime['wktime_enable_billing_module'].to_i == 1 ) && isModuleAdmin('wktime_billing_groups')
+			
+	end
+	
+	# Return the given type of custom Fields array
+	# Used in plugin settings
+	def getCfListArr(customFields, cfType, needBlank)
+		unless customFields.blank?
+			cfs = customFields.select {|cf| cf.field_format == cfType }
+			unless cfs.blank?
+				cfArray = cfs.collect {|cf| [cf.name, cf.id] }
+			else
+				cfArray = Array.new
+			end
+		else
+			cfArray = Array.new
+		end
+		cfArray.unshift(["",0]) if needBlank
+		cfArray
+	end
+	
+	def getPluginSetting(setting_name)
+		Setting.plugin_redmine_wktime[setting_name]
+	end
+	
+	def isModuleAdmin(settings)
+		group = nil
+		isbillingUser = false
+		groupusers = Array.new
+		billingGrpId = getSettingCfId(settings)
+		if !billingGrpId.blank? && billingGrpId != 0
+				scope = User.in_group(billingGrpId)	
+				groupusers << scope.all
+		end
+		grpUserIds = Array.new		
+		grpUserIds = groupusers[0].collect{|user| user.id}.uniq if !groupusers.blank? && !groupusers[0].blank?
+		isbillingUser = grpUserIds.include?(User.current.id)
+	end
+	
+	def getSettingCfId(settingId)
+		cfId = Setting.plugin_redmine_wktime[settingId].blank? ? 0 : Setting.plugin_redmine_wktime[settingId].to_i
+		cfId
+	end
+	
+	def isBilledTimeEntry(tEntry)
+		ret = false
+		unless tEntry.blank?
+			cfEntry = tEntry.custom_value_for(getSettingCfId('wktime_billing_id_cf'))
+			ret = true unless cfEntry.blank? || cfEntry.value.blank?
+		end
+		ret
+	end
+	
+	def showAccounting
+		(!Setting.plugin_redmine_wktime['wktime_enable_accounting_module'].blank? &&
+			Setting.plugin_redmine_wktime['wktime_enable_accounting_module'].to_i == 1 ) && (isModuleAdmin('wktime_accounting_group') || isModuleAdmin('wktime_accounting_admin') )
+	end
+	
+	def isChecked(settingName)
+		(!Setting.plugin_redmine_wktime[settingName].blank? && Setting.plugin_redmine_wktime[settingName].to_i == 1)
+	end
+	
+	def showCRMModule
+		(!Setting.plugin_redmine_wktime['wktime_enable_crm_module'].blank? &&
+			Setting.plugin_redmine_wktime['wktime_enable_crm_module'].to_i == 1 ) && (isModuleAdmin('wktime_crm_group') || isModuleAdmin('wktime_crm_admin') )
+	end
+	
+	def getGroupUserIdsArr(groupId)
+		userIdArr = User.in_group(groupId).all.pluck(:id)
+		userIdArr
+	end
+	
+	def getGroupUserArr(groupId)
+		userIdArr = Array.new
+		userIds = User.in_group(groupId).all
+		if !userIds.blank?
+			userIds.each do | entry|				
+				userIdArr <<  [(entry.firstname + " " + entry.lastname), entry.id  ]
+			end
+		end
+		userIdArr
+	end
+	
+	def groupOfUsers
+		grpArr = nil
+		grpArr = (getGroupUserArr(getSettingCfId('wktime_crm_group')) + 
+				  getGroupUserArr(getSettingCfId('wktime_crm_admin'))).uniq
+		grpArr.unshift(["",0]) 
+			
+		grpArr
+	end
+	
+	def showTimeExpense
+		(!Setting.plugin_redmine_wktime['wktime_enable_time_module'].blank? &&
+			Setting.plugin_redmine_wktime['wktime_enable_time_module'].to_i == 1) || (!Setting.plugin_redmine_wktime['wktime_enable_expense_module'].blank? &&
+			Setting.plugin_redmine_wktime['wktime_enable_expense_module'].to_i == 1)
+	end
+	
+	def getDatesSql(from, intervalVal, intervalType)
+		sqlStr = "(select " + getAddMonthDateStr(from,intervalVal,intervalType) + " selected_date from " +
+			"(select 0 i union select 1 union select 2 union select 3 union select 4 union select 5 union select 6 union select 7 union select 8 union select 9) t0,
+			 (select 0 i union select 1 union select 2 union select 3 union select 4 union select 5 union select 6 union select 7 union select 8 union select 9) t1,
+			 (select 0 i union select 1 union select 2 union select 3 union select 4 union select 5 union select 6 union select 7 union select 8 union select 9) t2,
+			 (select 0 i union select 1 union select 2 union select 3 union select 4 union select 5 union select 6 union select 7 union select 8 union select 9) t3,
+			 (select 0 i union select 1 union select 2 union select 3 union select 4 union select 5 union select 6 union select 7 union select 8 union select 9)t4"
+		if intervalType == 'month'
+			sqlStr = sqlStr + " where #{getIntervalFormula(intervalVal)}<24000" 
+		end
+		sqlStr = sqlStr + " )v"
+	
+	end
+	
+	def getAddMonthDateStr(dtfield,intervalVal,intervalType)
+		interval = getIntervalFormula(intervalVal)
+		if ActiveRecord::Base.connection.adapter_name == 'PostgreSQL'			 
+			dateSqlStr = "date('#{dtfield}') + interval '1 month' * "	+ interval.to_s
+		elsif ActiveRecord::Base.connection.adapter_name == 'SQLite'			 
+			dateSqlStr = "date('#{dtfield}' , '+' || " + "(#{interval.to_s})" + " || ' months')"
+		elsif ActiveRecord::Base.connection.adapter_name == 'SQLServer'		
+			dateSqlStr = "DateAdd(m, " + interval.to_s + ",'#{dtfield}')"
+		else
+			dateSqlStr = "adddate('#{dtfield}', INTERVAL " + interval.to_s + " MONTH )"
+		end		
+		dateSqlStr
+	end
+	
+	def getIntervalFormula(intervalVal)
+		" (t4.i*#{intervalVal}*10000 + t3.i*#{intervalVal}*1000 + t2.i*#{intervalVal}*100 + t1.i*#{intervalVal}*10 + t0.i*#{intervalVal}) "
+	end
+	
+	def isLocked(startdate)
+		isLocked = false
+		lock = WkTeLock.order(id: :desc)	
+		if !lock.blank? && lock.size > 0		
+			startdate = startdate.to_s.to_date
+			isLocked = startdate <= lock[0].lock_date.to_date			
+		end
+		isLocked
+	end
+	
+	def concatColumnsSql(columnsArr, aliasName, joinChar)
+		joinChar = ' ' if joinChar.blank?
+		if ActiveRecord::Base.connection.adapter_name == 'SQLServer'	
+			concatSql = " #{columnsArr.join(" + '#{joinChar}' + ")} "	
+		elsif ActiveRecord::Base.connection.adapter_name == 'SQLite'
+			concatSql = " #{columnsArr.join(" || '#{joinChar}' || ")} "
+		else
+			concatSql = " concat( #{columnsArr.join(" , '#{joinChar}' , ")}) "
+		end
+		concatSql = concatSql + " as #{aliasName} " unless aliasName.blank?
+		concatSql
+	end
+		
+	def showPurchase
+		(!Setting.plugin_redmine_wktime['wktime_enable_pur_module'].blank? &&
+			Setting.plugin_redmine_wktime['wktime_enable_pur_module'].to_i == 1 ) && (isModuleAdmin('wktime_pur_group') || isModuleAdmin('wktime_pur_admin') )
+	end
+	
+	
 end

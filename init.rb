@@ -23,7 +23,13 @@ module Redmine::MenuManager::MenuHelper
     if project && !project.new_record?
       :project_menu
     else
-      if %w(wktime wkexpense wkattendance wkreport).include? params[:controller]
+	  controllerArr = ["wktime", "wkexpense", "wkattendance", "wkreport", "wkpayroll",  "wkinvoice", "wkcrmaccount", "wkcontract", "wkaccountproject", "wktax", "wkgltransaction", "wkledger", "wklead", "wkopportunity", "wkcrmactivity", "wkcrmcontact", "wkcrmenumeration", "wkpayment", "wkexchangerate","wkpurchase","wkrfq","wkquote","wkpurchaseorder","wksupplierinvoice","wksupplierpayment","wksupplieraccount","wksuppliercontact" ]
+	  externalMenus = call_hook :external_erpmine_menus
+	   externalMenus = externalMenus.split(' ')
+	  unless externalMenus.blank?
+		controllerArr = controllerArr + externalMenus
+	  end
+      if controllerArr.include? params[:controller]
         :wktime_menu
       else
         :application_menu
@@ -166,17 +172,77 @@ module TimelogControllerPatch
 		end
 	end
 end
+
+
+module SettingsControllerPatch
+	def self.included(base)
+		base.send(:include)
+		
+		base.class_eval do
+			def plugin
+				wkpayroll_helper = Object.new.extend(WkpayrollHelper)
+				settinghash = Hash.new()
+				payrollValues = Hash.new()
+				settinghash = params[:settings]		
+				if !settinghash.blank? 
+					payrollValues[:basic] = settinghash["wktime_payroll_basic"]
+					payrollValues[:allowances] = settinghash["wktime_payroll_allowances"]
+					payrollValues[:deduction] = settinghash["wktime_payroll_deduction"]			
+					payrollValues[:payroll_deleted_ids] = settinghash["payroll_deleted_ids"]
+					settinghash.delete("wktime_payroll_basic") 
+					settinghash.delete("wktime_payroll_allowances") 
+					settinghash.delete("wktime_payroll_deduction") 
+					settinghash.delete("payroll_deleted_ids")
+					params[:settings] = settinghash
+				end	
+				@plugin = Redmine::Plugin.find(params[:id])
+				unless @plugin.configurable?
+				  render_404
+				  return
+				end
+				
+				if request.post?
+				  Setting.send "plugin_#{@plugin.id}=", params[:settings]
+				  wkpayroll_helper.savePayrollSettings(payrollValues)
+				  flash[:notice] = l(:notice_successful_update)
+				  redirect_to plugin_settings_path(@plugin)
+				else
+				  @partial = @plugin.settings[:partial]			   
+				  @settings = Setting.send "plugin_#{@plugin.id}"				
+				  dep_list = WkSalaryComponents.order('name')
+				  basic = Array.new
+				  allowance = Array.new
+				  deduction = Array.new
+				  hashval = Hash.new()
+				  unless dep_list.blank?
+						dep_list.each do |list| 
+						basic = [list.id.to_s + '|' + list.name + '|' + list.salary_type + '|' + list.factor.to_s + '|' + list.ledger_id.to_s ]  if list.component_type == 'b'	
+						allowance = allowance << list.id.to_s + '|' + list.name+'|'+list.frequency.to_s+'|'+ (list.start_date).to_s+'|'+(list.dependent_id).to_s+'|'+list.factor.to_s + '|' + list.ledger_id.to_s	if list.component_type == 'a'
+						deduction = deduction << list.id.to_s + '|' + list.name + '|' + list.frequency.to_s + '|' + (list.start_date).to_s + '|' + (list.dependent_id).to_s + '|' + (list.factor).to_s + '|' + list.ledger_id.to_s if list.component_type == 'd'
+							
+						end
+					end
+					hashval["wktime_payroll_basic"] = basic
+					hashval["wktime_payroll_allowances"] = allowance
+					hashval["wktime_payroll_deduction"] = deduction
+					@settings.merge!(hashval)
+				end				
+			end
+		end
+	end
+end
   
 CustomFieldsHelper.send(:include, WktimeHelperPatch)
 ProjectsController.send(:include, ProjectsControllerPatch)
 IssuesController.send(:include, IssuesControllerPatch)
 TimelogController.send(:include, TimelogControllerPatch)
+SettingsController.send(:include, SettingsControllerPatch)
 
 Redmine::Plugin.register :redmine_wktime do
-  name 'Time & Attendance'
+  name 'ERPmine'
   author 'Adhi Software Pvt Ltd'
-  description 'This plugin is for entering Time & Attendance'
-  version '2.3'
+  description 'ERPmine is an ERP for Service Industries. It has the following modules: Time & Expense, Attendance, Payroll, CRM, Billing, Accounting and Purchasing'
+  version '2.9.1'
   url 'http://www.redmine.org/plugins/wk-time'
   author_url 'http://www.adhisoftware.co.in/'
   
@@ -230,9 +296,11 @@ Redmine::Plugin.register :redmine_wktime do
 			 'wktime_max_hour_week' => '0',
 			 'wktime_restr_min_hour_week' => '0',
 			 'wktime_min_hour_week' => '0',
+			 'wktime_enable_time_module' => '1',
 			 'wktime_enable_expense_module' => '1',
 			 'wktime_enable_report_module' => '1',
 			 'wktime_enable_attendance_module' => '1',
+			 'wktime_enable_payroll_module' => '1',
 			 'wktime_auto_import' => '0',
 			 'wktime_field_separator' => ['0'],
 			 'wktime_field_wrapper'  => ['0'],
@@ -243,20 +311,39 @@ Redmine::Plugin.register :redmine_wktime do
 			 'wktime_auto_import_time_hr' => '23',
 			 'wktime_auto_import_time_min' => '0',
 			 'wktime_file_to_import' => '0',
-			 'wktime_import_file_headers' => '0'
+			 'wktime_import_file_headers' => '0',
+			 'wktime_enable_billing_module' => '0',
+			 'wktime_auto_generate_invoice' => '0',
+			 'wktime_generate_invoice_from' => nil,
+			 'wktime_billing_groups' => '0',
+			 'wktime_enable_accounting_module' => '0',
+			 'wktime_accounting_group' => '0',
+			 'wktime_accounting_admin' => '0',
+			 'wktime_crm_group' => '0',
+			 'wktime_crm_admin' => '0',
+			 'wktime_minimum_working_days_for_accrual' => '11',
+			 'wktime_enable_crm_module' => '0',
+			 'wktime_enable_pur_module' => '0',
+			 'wktime_pur_group' => '0',
+			 'wktime_pur_admin' => '0'
   })  
- 
-  menu :top_menu, :wkTime, { :controller => 'wktime', :action => 'index' }, :caption => :label_ta, :if => Proc.new { Object.new.extend(WktimeHelper).checkViewPermission } 	
+	menu :top_menu, :wkTime, { :controller => 'wktime', :action => 'index' }, :caption => :label_erpmine, :if => Proc.new { Object.new.extend(WktimeHelper).checkViewPermission } 
+  	
   project_module :time_tracking do
 	permission :approve_time_entries,  {:wktime => [:update]}, :require => :member	
   end
   
   
   Redmine::MenuManager.map :wktime_menu do |menu|
-	  menu.push :wktime, { :controller => 'wktime', :action => 'index' }, :caption => :label_wktime, :if => Proc.new { Object.new.extend(WktimeHelper).checkViewPermission }
-	  menu.push :wkexpense, { :controller => 'wkexpense', :action => 'index' }, :caption => :label_wkexpense, :if => Proc.new { Object.new.extend(WktimeHelper).checkViewPermission && Object.new.extend(WktimeHelper).showExpense }
-	  menu.push :wkattendance, { :controller => 'wkattendance', :action => 'index' }, :caption => :label_wk_attendance, :if => Proc.new { Object.new.extend(WktimeHelper).checkViewPermission && Object.new.extend(WktimeHelper).showAttendance}
-	  menu.push :wkreport, { :controller => 'wkreport', :action => 'index' }, :caption => :label_report_plural, :if => Proc.new { Object.new.extend(WktimeHelper).checkViewPermission && Object.new.extend(WktimeHelper).showReports}
+	  menu.push :wktime, { :controller => 'wktime', :action => 'index' }, :caption => :label_te, :if => Proc.new { Object.new.extend(WktimeHelper).checkViewPermission && Object.new.extend(WktimeHelper).showTimeExpense }
+	  menu.push :wkattendance, { :controller => 'wkattendance', :action => 'index' }, :caption => :report_attendance, :if => Proc.new { Object.new.extend(WktimeHelper).checkViewPermission && Object.new.extend(WktimeHelper).showAttendance}
+	  menu.push :wkpayroll, { :controller => 'wkpayroll', :action => 'index' }, :caption => :label_payroll, :if => Proc.new { Object.new.extend(WktimeHelper).checkViewPermission && Object.new.extend(WktimeHelper).showPayroll }
+	  menu.push :wklead, { :controller => 'wklead', :action => 'index' }, :caption => :label_crm, :if => Proc.new { Object.new.extend(WktimeHelper).checkViewPermission && Object.new.extend(WktimeHelper).showCRMModule }
+	  menu.push :wkinvoice, { :controller => 'wkinvoice', :action => 'index' }, :caption => :label_wk_billing, :if => Proc.new { Object.new.extend(WktimeHelper).checkViewPermission && Object.new.extend(WktimeHelper).showBilling }
+	  menu.push :wkgltransaction, { :controller => 'wkgltransaction', :action => 'index' }, :caption => :label_accounting, :if => Proc.new { Object.new.extend(WktimeHelper).checkViewPermission && Object.new.extend(WktimeHelper).showAccounting }
+	  menu.push :wkrfq, { :controller => 'wkrfq', :action => 'index' }, :caption => :label_purchasing, :if => Proc.new { Object.new.extend(WktimeHelper).checkViewPermission && Object.new.extend(WktimeHelper).showPurchase }
+	  menu.push :wkreport, { :controller => 'wkreport', :action => 'index' }, :caption => :label_report_plural, :if => Proc.new { Object.new.extend(WktimeHelper).checkViewPermission && Object.new.extend(WktimeHelper).showReports}	
+	  menu.push :wkcrmenumeration, { :controller => 'wkcrmenumeration', :action => 'index' }, :caption => :label_settings, :if => Proc.new { Object.new.extend(WktimeHelper).checkViewPermission && User.current.admin? }
 	end	
 
 end
@@ -288,6 +375,7 @@ Rails.configuration.to_prepare do
 				end
 			end
 		end
+		
 		if (!Setting.plugin_redmine_wktime['wktime_enable_clock_in_out'].blank? && Setting.plugin_redmine_wktime['wktime_enable_clock_in_out'].to_i == 1)
 			require 'rufus/scheduler'
 			scheduler2 = Rufus::Scheduler.new
@@ -303,6 +391,7 @@ Rails.configuration.to_prepare do
 				end
 			end
 		end
+		
 		if (!Setting.plugin_redmine_wktime['wktime_auto_import'].blank? && Setting.plugin_redmine_wktime['wktime_auto_import'].to_i == 1)
 			require 'rufus/scheduler'
 			importScheduler = Rufus::Scheduler.new		
@@ -328,6 +417,100 @@ Rails.configuration.to_prepare do
 					end
 				rescue Exception => e
 					Rails.logger.info "Import failed: #{e.message}"
+				end
+			end
+		end
+		
+		if (!Setting.plugin_redmine_wktime['wktime_auto_generate_salary'].blank? && Setting.plugin_redmine_wktime['wktime_auto_generate_salary'].to_i == 1)
+			require 'rufus/scheduler'
+			salaryScheduler = Rufus::Scheduler.new
+			payperiod = Setting.plugin_redmine_wktime['wktime_pay_period']
+			payDay = Setting.plugin_redmine_wktime['wktime_pay_day']
+			if payperiod == 'm'
+				#Scheduler will run at 12:01 AM on 1st of every month
+				cronSt = "01 00 01 * *"
+			else
+				#Scheduler will run at 12:01 AM on payDay of every week
+				cronSt = "01 00 * * #{payDay}"
+			end
+			salaryScheduler.cron cronSt do		
+				begin
+					currentMonthStart = Date.civil(Date.today.year, Date.today.month, Date.today.day)
+					runJob = true
+					# payperiod is bi-weekly then run scheduler every two weeks 
+					if payperiod == 'bw'
+						salaryCount = WkSalary.where("salary_date between '#{currentMonthStart-14}' and '#{currentMonthStart-1}'").count
+						runJob = false if salaryCount > 0
+					end
+					if runJob
+						Rails.logger.info "==========Payroll job - Started=========="
+						wkpayroll_helper = Object.new.extend(WkpayrollHelper)
+						errorMsg = wkpayroll_helper.generateSalaries(nil,currentMonthStart)
+						Rails.logger.info "===== Payroll generated Successfully =====" 
+					end
+				rescue Exception => e
+					Rails.logger.info "Job failed: #{e.message}"
+				end
+			end
+		end
+		
+		if (!Setting.plugin_redmine_wktime['wktime_auto_generate_invoice'].blank? && Setting.plugin_redmine_wktime['wktime_auto_generate_invoice'].to_i == 1)
+			require 'rufus/scheduler'
+			invoiceScheduler = Rufus::Scheduler.new
+			invPeriod = Setting.plugin_redmine_wktime['wktime_generate_invoice_period']
+			invDay = Setting.plugin_redmine_wktime['wktime_generate_invoice_day']
+			genInvFrom = Setting.plugin_redmine_wktime['wktime_generate_invoice_from'].to_date
+			if invPeriod == 'm' || invPeriod == 'q'
+				#Scheduler will run at 12:01 AM on 1st of every month
+				cronSt = "01 00 01 * *"
+			else
+				#Scheduler will run at 12:01 AM on invDay of every week
+				cronSt = "01 00 * * #{invDay.blank? ? 0 : invDay}"
+			end
+			invoiceScheduler.cron cronSt do		
+				begin
+					invoicePeriod = nil
+					fromDate = nil
+					currentMonthStart = Date.civil(Date.today.year, Date.today.month, Date.today.day)
+					runJob = true
+					case invPeriod
+					  when 'q'
+						fromDate = currentMonthStart<<4 < genInvFrom ? genInvFrom : currentMonthStart<<4
+						#Scheduler will run at 12:01 AM on 1st of every April, July, October and January months
+						runJob = false if (currentMonthStart.month%3)-1 > 0
+					  when 'w'
+						#Scheduler will run at 12:01 AM on invDay of every week
+						fromDate = currentMonthStart-7 < genInvFrom ? genInvFrom : currentMonthStart-7
+					  when 'bw'
+						invoiceCount = WkInvoice.where("invoice_date between '#{currentMonthStart-14}' and '#{currentMonthStart-1}'").count
+						runJob = false if invoiceCount > 0
+						fromDate = currentMonthStart-14 < genInvFrom ? genInvFrom : currentMonthStart-14
+					  else
+						#Scheduler will run at 12:01 AM on 1st of every month
+						fromDate = (currentMonthStart-1).beginning_of_month < genInvFrom ? genInvFrom : (currentMonthStart-1).beginning_of_month
+					end
+					invoicePeriod = [fromDate, currentMonthStart-1]
+					if runJob
+						Rails.logger.info "==========Invoice job - Started=========="
+						invoiceHelper = Object.new.extend(WkinvoiceHelper)
+						allAccProjets = WkAccountProject.all
+						errorMsg = nil
+						allAccProjets.each do |accProj|
+							errorMsg = invoiceHelper.generateInvoices(accProj, nil, currentMonthStart, invoicePeriod)#account.id
+						end
+						if errorMsg.blank?
+							Rails.logger.info "===== Invoice generated Successfully ====="
+						else
+							if errorMsg.is_a?(Hash)
+								Rails.logger.info "===== Invoice generated Successfully ====="
+								Rails.logger.info "===== Job failed: #{errorMsg['trans']} ====="
+							else
+								Rails.logger.info "===== Job failed: #{errorMsg} ====="
+							end
+						end
+					end
+				rescue Exception => e
+					Rails.logger.info "Job failed: #{e.message}"
 				end
 			end
 		end
@@ -372,13 +555,13 @@ class WktimeHook < Redmine::Hook::ViewListener
 	end
 	
 	# Added expense report link in redmine core 'projects/show.html' using hook
-	def view_projects_show_sidebar_bottom(context={})
+	def view_projects_show_left(context={})
 		if !context[:project].blank?
 			wktime_helper = Object.new.extend(WktimeHelper)		
 			host_with_subdir = wktime_helper.getHostAndDir(context[:request])	
 			project_ids = Setting.plugin_redmine_wktime['wkexpense_projects']		
 			if project_ids.blank? || (!project_ids.blank? && (project_ids == [""] || project_ids.include?("#{context[:project].id}"))) && User.current.allowed_to?(:view_time_entries, context[:project])
-				"#{link_to(l(:label_wkexpense_reports), url_for(:controller => 'wkexpense', :action => 'reportdetail', :project_id => context[:project], :host => host_with_subdir, :only_path => true))}"
+				"<p style='float:left; padding-left:190px;  margin-top:-60px;'>| #{link_to(l(:label_wkexpense_reports), url_for(:controller => 'wkexpense', :action => 'reportdetail', :project_id => context[:project], :host => host_with_subdir, :only_path => true))}</p>"
 			end
 		end
 	end

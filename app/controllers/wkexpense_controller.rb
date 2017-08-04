@@ -1,3 +1,20 @@
+# ERPmine - ERP for service industry
+# Copyright (C) 2011-2016  Adhi software pvt ltd
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+
 class WkexpenseController < WktimeController	
   unloadable  
   
@@ -32,7 +49,7 @@ class WkexpenseController < WktimeController
   end
   
   def getUnit(entry)
-	entry.nil? ? l('number.currency.format.unit') : entry[:currency]
+	entry.nil? ? number_currency_format_unit : entry[:currency]
   end
   
   def getUnitDDHTML
@@ -239,17 +256,18 @@ private
   def delete(ids)
 	#WkExpenseEntry.delete(ids)
 	errMsg = false
-	@expense_entries = WkExpenseEntry.find_by_sql("SELECT * FROM wk_expense_entries w where id = #{ids} ;")
+	@expense_entries = WkExpenseEntry.where(:id => ids)#WkExpenseEntry.find_by_sql("SELECT * FROM wk_expense_entries w where id = #{ids} ;")
 	destroyed = WkExpenseEntry.transaction do
-	@expense_entries.each do |t|
-		status = getExpenseEntryStatus(t.spent_on, t.user_id)
-		if !status.blank? && ('a' == status || 's' == status || 'l' == status)					
-			 errMsg = false 
-		else
-			errMsg = true
-			WkExpenseEntry.delete(ids)
-		end		
-	  end
+		@expense_entries.each do |t|
+			status = getExpenseEntryStatus(t.spent_on, t.user_id)
+			if !status.blank? && ('a' == status || 's' == status || 'l' == status)					
+				 errMsg = false 
+			else
+				errMsg = true
+				WkExpenseEntry.delete(ids)
+				break
+			end		
+		end
 	end
 	errMsg
   end

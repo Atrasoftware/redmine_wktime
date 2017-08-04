@@ -1,0 +1,24 @@
+<%= form_tag({:controller => controller_name, :action => 'update'}, :method => :post, :id => 'query_form') do %>
+	<h2><b><%=@accountEntry.blank? ? l(:label_new_account) : l(:label_edit_account) %></b></h2>
+	<div id="account_form">
+		<% addressObj = @accountEntry.blank? ? nil : @accountEntry.address %>
+		<%=h hidden_field_tag('account_id', @accountEntry.blank? ? "" : @accountEntry.id) %>
+		<%=h hidden_field_tag('address_id', @accountEntry.blank? ? "" : @accountEntry.address_id) %>
+		<div class="splitcontentleft">
+			<%= render partial: "wklead/lead_info", locals: { contactObj: nil, leadObj: nil, accountObj: @accountEntry, isAccount: true, isContact: false }%>
+		</div>
+		<div class="splitcontentright">
+			<%= render partial: "wklead/contact_info", locals: { address: addressObj }%>
+		</div>
+	</div>
+	<div style="clear:both;"></div>
+	<div>
+		<%= submit_tag l(:button_save) ,:id => 'wkaccount_save'%>
+	</div>
+<% end %>
+<% unless @accountEntry.blank? || @accountEntry.new_record? %>
+	</br>
+	<div>
+		<%= render partial: "wkcrm/accordion_section", locals: { currentObj: @accountEntry }%>
+	</div>
+<% end %>

@@ -1,3 +1,20 @@
+# ERPmine - ERP for service industry
+# Copyright (C) 2011-2016  Adhi software pvt ltd
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+
 class WktimeController < WkbaseController
 unloadable
 
@@ -91,8 +108,10 @@ include QueriesHelper
 	@editable = @wktime.nil? || @wktime.status == 'n' || @wktime.status == 'r'
 	hookPerm = call_hook(:controller_check_editable, {:editable => @editable, :user => @user})
 	@editable = hookPerm.blank? ? @editable : hookPerm[0]
-	hookPerm = call_hook(:controller_check_locked, {:startdate => @startday})
-	@locked = hookPerm.blank? ? false : hookPerm[0]
+	#below two lines are hook code for lock TE
+	# hookPerm = call_hook(:controller_check_locked, {:startdate => @startday})
+	# @locked = hookPerm.blank? ? false : hookPerm[0]
+	@locked  = isLocked(@startday)
 	@editable = false if @locked
 	set_edit_time_logs
 	@entries = findEntries()
@@ -109,7 +128,7 @@ include QueriesHelper
 	isError = params[:isError].blank? ? false : to_boolean(params[:isError])
 	if (!$tempEntries.blank? && isError)
 		@entries.each do |entry|	
-			if !entry.editable_by?(User.current) && !isAccountUser
+			if !entry.editable_by?(User.current) && !isAccountUser && !isBilledTimeEntry(entry)
 				$tempEntries << entry
 			end
 		end
@@ -175,7 +194,7 @@ include QueriesHelper
 						if (!entry.id.blank? && !entry.editable_by?(User.current))
 							allowSave = false
 						end
-						allowSave = true if (to_boolean(@edittimelogs) || isAccountUser)
+						allowSave = true if (to_boolean(@edittimelogs) || isAccountUser || !isBilledTimeEntry(entry))
 						#if !((Setting.plugin_redmine_wktime['wktime_allow_blank_issue'].blank? ||
 						#		Setting.plugin_redmine_wktime['wktime_allow_blank_issue'].to_i == 0) && 
 						#		entry.issue.blank?)
@@ -340,8 +359,10 @@ include QueriesHelper
 		setup
 		#cond = getCondition('spent_on', @user.id, @startday, @startday+6)
 		#TimeEntry.delete_all(cond)
-		hookPerm = call_hook(:controller_check_locked, {:startdate => @startday})
-		locked = hookPerm.blank? ? false : hookPerm[0]
+		#below two lines are hook code for lock TE
+		#hookPerm = call_hook(:controller_check_locked, {:startdate => @startday})
+		#locked = hookPerm.blank? ? false : hookPerm[0]
+		locked  = isLocked(@startday)
 		findWkTE(@startday)	
 		if locked
 			flash[:error] = l(:error_time_entry_delete)
@@ -971,6 +992,28 @@ include QueriesHelper
 		(Setting.plugin_redmine_wktime['wktime_min_hour_week'].blank? ? 0 : Setting.plugin_redmine_wktime['wktime_min_hour_week']) : 0
 	end
 	
+	def lockte
+		@lock = WkTeLock.order(id: :desc)
+		render :action => 'lockte'
+	end
+	
+	 def lockupdate		
+		telock = WkTeLock.new 
+		telock.lock_date= params[:lock_date]
+		telock.locked_by =User.current.id	
+		errorMsg =nil			
+		if !telock.save()
+			errorMsg = telock.errors.full_messages.join('\n')
+		end
+		if errorMsg.nil?	
+			redirect_to :controller => 'wktime',:action => 'index' 
+			flash[:notice] = l(:notice_successful_update)
+		else
+			flash[:error] = errorMsg
+			redirect_to :action => 'new'
+		end		
+	 end
+	
 private
 	
 	def getManager(user, approver)
@@ -1178,8 +1221,8 @@ private
 											Setting.plugin_redmine_wktime['wktime_enter_cf_in_row2'].to_i == custom_field.id))
 											if use_detail_popup
 												cvs = custom_values[custom_field.id]
-												custom_value.value = cvs[k].blank? ? nil : 
-												custom_field.multiple? ? cvs[k].split(',') : cvs[k]	
+												#custom_value.value = cvs[k].blank? ? nil : (custom_field.multiple? ? cvs[k].split(',') : cvs[k])	
+												teEntry.custom_field_values = {custom_field.id => cvs[k].blank? ? nil : (custom_field.multiple? ? cvs[k].split(',') : cvs[k])}
 											end
 										end
 									end
@@ -1363,7 +1406,8 @@ private
 	end
   
     def check_editPermission
-		allowed = true;
+		allowed = true
+		hasBilledEntry = false
 		if api_request?
 			ids = gatherIDs			
 		else
@@ -1377,12 +1421,16 @@ private
 			@entries = findEntriesByCond(cond)
 		end
 		@entries.each do |entry|
-			if(!entry.editable_by?(User.current))
+			if isBilledTimeEntry(entry)
+				hasBilledEntry = true
 				allowed = false
 				break
 			end
+			if(!entry.editable_by?(User.current)) 
+				allowed = false
+			end
 		end
-		allowed = true if isAccountUser
+		allowed = true if isAccountUser && !hasBilledEntry
 		return allowed
 	end
 	

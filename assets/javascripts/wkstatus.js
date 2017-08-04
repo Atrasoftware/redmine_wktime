@@ -87,7 +87,10 @@ function showMessage(data,divID){
 	}
 
 	if (errMsg != "") {	
-		document.getElementById('time_entry_hours').disabled = true;
+		if(document.getElementById('time_entry_hours') != null)
+		{
+			document.getElementById('time_entry_hours').disabled = true;
+		}
 		divID.innerHTML = errMsg;
 		if(log_time_page == "true") {
 			$('input[type="submit"]').prop('disabled', true);
@@ -95,7 +98,11 @@ function showMessage(data,divID){
 		divID.style.display = 'block';
 	}
 	else {
-		document.getElementById('time_entry_hours').disabled = false;
+		if(document.getElementById('time_entry_hours') != null)
+		{
+			document.getElementById('time_entry_hours').disabled = false;
+		}
+		
 		if(log_time_page == "true") {
 			$('input[type="submit"]').prop('disabled', false);
 		}
@@ -137,7 +144,10 @@ function showIssueMessage(data,divID) {
 	}	
 	
 	if (errMsg != "") {	
-		document.getElementById('time_entry_hours').disabled = true;
+		if(document.getElementById('time_entry_hours') != null)
+		{
+			document.getElementById('time_entry_hours').disabled = true;
+		}
 		divID.innerHTML = errMsg;
 		if(log_time_page == "true") {
 			$('input[type="submit"]').prop('disabled', true);
@@ -145,7 +155,10 @@ function showIssueMessage(data,divID) {
 		divID.style.display = 'block';
 	}
 	else {
-		document.getElementById('time_entry_hours').disabled = false;
+		if(document.getElementById('time_entry_hours') != null)
+		{
+			document.getElementById('time_entry_hours').disabled = false;
+		}
 		if(log_time_page == "true") {
 			$('input[type="submit"]').prop('disabled', false);
 		}
@@ -206,9 +219,9 @@ function signAttendance(str)
 	  document.getElementById('clockin' ).style.display = "block";
 	  document.getElementById('clockout').style.display = "none";
 	}
-	
+	var clkInOutUrl = document.getElementById('clockinout_url').value;	
 	$.ajax({	
-	url: '/updateClockInOut',
+	url: clkInOutUrl,//'/updateClockInOut',
 	type: 'get',
 	data: {startdate : datevalue, str: str},
 	success: function(data){ }   
