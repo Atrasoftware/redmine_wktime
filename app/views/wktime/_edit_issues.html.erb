@@ -11,7 +11,7 @@ currencySym = ""
 
 <div class="wk-contextual">
 <% if @editable %>
-	<%= link_to l(:button_add_row), "#", { :onclick => "javascript:addRow();projectChanged(document.getElementsByName('time_entry[][project_id]'),0);", :class => 'icon icon-time-add' }%>
+	<%= link_to l(:button_add_row), "#", { :onclick => "javascript:$('.time-entry').children('.project').children('select').select2('destroy');addRow();projectChanged(document.getElementsByName('time_entry[][project_id]'),0);do_select2();", :class => 'icon icon-time-add' }%>
 <% end %>
 </div>
 <div style="overflow: auto">
@@ -136,8 +136,13 @@ currencySym = ""
 <div class="splitcontentright">
 <div class="contextual">
 <% if @editable %>
-	<%= link_to l(:button_add_row), "#", { :onclick => "javascript:addRow();projectChanged(document.getElementsByName('time_entry[][project_id]'),0);", :class => 'icon icon-time-add' } %>
+	<%= link_to l(:button_add_row), "#", { :onclick => "javascript:$('.time-entry').children('.project').children('select').select2('destroy');addRow();projectChanged(document.getElementsByName('time_entry[][project_id]'),0);do_select2();", :class => 'icon icon-time-add' } %>
 <% end %>
 </div>
 </div>
 <%= context_menu %>
+<script>
+	function do_select2(){
+		$('.time-entry').children('.project').children('select').select2();
+	}
+</script>
