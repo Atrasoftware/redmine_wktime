@@ -561,7 +561,7 @@ class WktimeHook < Redmine::Hook::ViewListener
 			host_with_subdir = wktime_helper.getHostAndDir(context[:request])	
 			project_ids = Setting.plugin_redmine_wktime['wkexpense_projects']		
 			if project_ids.blank? || (!project_ids.blank? && (project_ids == [""] || project_ids.include?("#{context[:project].id}"))) && User.current.allowed_to?(:view_time_entries, context[:project])
-				"<p style='float:left; padding-left:190px;  margin-top:-60px;'>| #{link_to(l(:label_wkexpense_reports), url_for(:controller => 'wkexpense', :action => 'reportdetail', :project_id => context[:project], :host => host_with_subdir, :only_path => true))}</p>"
+				"<p id='expense_report' hidden>| #{link_to(l(:label_wkexpense_reports), url_for(:controller => 'wkexpense', :action => 'reportdetail', :project_id => context[:project], :host => host_with_subdir, :only_path => true))} </p><script>$(function(){ $('.spent_time').children('p').last().append( $('#expense_report').html()) })</script/>"
 			end
 		end
 	end
